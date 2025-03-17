@@ -67,10 +67,20 @@ Four edubfm_FlushTrain(
     Four 			e;			/* for errors */
     Four 			index;			/* for an index */
 
-
 	/* Error check whether using not supported functionality by EduBfM */
 	if (RM_IS_ROLLBACK_REQUIRED()) ERR(eNOTSUPPORTED_EDUBFM);
 
+    index = edubfm_LookUp((BfMHashKey *)trainId, type);
+    if (index == NOTFOUND_IN_HTABLE) {
+        return eNOTFOUND_BFM;
+    }
+    if (BI_BITS(type, index) & DIRTY){
+        e = RDsM_WriteTrain(BI_BUFFER(type, index), trainId, BI_BUFSIZE(type));
+        if (e < 0){
+            return e;
+        }
+        BI_BITS(type, index) &= ~DIRTY;
+    }
 
 	
     return( eNOERROR );
