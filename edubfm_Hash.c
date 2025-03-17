@@ -34,7 +34,7 @@
  *
  * Exports:
  *  Four edubfm_LookUp(BfMHashKey *, Four)
- *  Four edubfm_Insert(BfMHaskKey *, Two, Four)
+ *  Four edubfm_Insert(BfMHashKey *, Two, Four)
  *  Four edubfm_Delete(BfMHashKey *, Four)
  *  Four edubfm_DeleteAll(void)
  */
@@ -86,12 +86,18 @@ Four edubfm_Insert(
     Two  		hashValue;
 
 
-    CHECKKEY(key);    /*@ check validity of key */
+    CHECKKEY(key)    /*@ check validity of key */
 
     if( (index < 0) || (index > BI_NBUFS(type)) )
         ERR( eBADBUFINDEX_BFM );
 
-   
+    i = BFM_HASH(key, type);
+    hashValue = BI_HASHTABLEENTRY(type, hashValue);
+
+    if(hashValue != NIL){
+        BI_NEXTHASHENTRY(type, index) = hashValue;
+    }
+    BI_HASHTABLEENTRY(type, i) = index;
 
     return( eNOERROR );
 
@@ -124,9 +130,24 @@ Four edubfm_Delete(
     Two                 hashValue;
 
 
-    CHECKKEY(key);    /*@ check validity of key */
+    CHECKKEY(key)   /*@ check validity of key */
+    hashValue = BFM_HASH(key, type);
+    i = BI_HASHTABLEENTRY(type, (Four)hashValue);
+    prev = NIL;
 
-
+    while (i != NIL){
+        if(BI_KEY(type, i).pageNo == key->pageNo
+         && BI_KEY(type, i).volNo == key->volNo){
+            if (prev == NIL){
+                BI_HASHTABLEENTRY(type, hashValue) = BI_NEXTHASHENTRY(type, i);
+            } else{
+                BI_HASHTABLEENTRY(type, prev) = BI_NEXTHASHENTRY(type, i);
+            }
+            return eNOERROR;
+        }
+        prev = i;
+        i = BI_NEXTHASHENTRY(type, i);
+    }
 
     ERR( eNOTFOUND_BFM );
 
@@ -145,9 +166,9 @@ Four edubfm_Delete(
  *  For ODYSSEUS/EduCOSMOS EduBfM, refer to the EduBfM project manual.)
  *
  *  Look up the given key in the hash table and return its
- *  corressponding index to the buffer table.
+ *  corresponding index to the buffer table.
  *
- * Retruns:
+ * Returns:
  *  index on buffer table entry holding the train specified by 'key'
  *  (NOTFOUND_IN_HTABLE - The key don't exist in the hash table.)
  */
@@ -159,8 +180,17 @@ Four edubfm_LookUp(
     Two                 hashValue;
 
 
-    CHECKKEY(key);    /*@ check validity of key */
+    CHECKKEY(key)    /*@ check validity of key */
+    hashValue = BFM_HASH(key, type);
+    i = BI_HASHTABLEENTRY(type, (Four)hashValue);
+    while (i != NIL){
+        if (BI_KEY(type, i).pageNo == key->pageNo
+            && BI_KEY(type, i).volNo == key->volNo){
+            return i;
+        }
+        i = BI_NEXTHASHENTRY(type, i);
 
+    }
 
 
     return(NOTFOUND_IN_HTABLE);
@@ -186,11 +216,14 @@ Four edubfm_LookUp(
  */
 Four edubfm_DeleteAll(void)
 {
-    Two 	i;
+    Four 	i;
     Four        tableSize;
-    
-
-
+    for(int type; type < NUM_BUF_TYPES; type++){
+        tableSize = HASHTABLESIZE(type);
+        for (i = 0; i < tableSize; i++) {
+            BI_HASHTABLEENTRY(type, i) = NIL;
+        }
+    }
     return(eNOERROR);
 
 } /* edubfm_DeleteAll() */ 

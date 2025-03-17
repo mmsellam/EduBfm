@@ -66,21 +66,50 @@ extern CfgParams_T sm_cfgParams;
  *  1) An index of a new buffer from the buffer pool
  *  2) Error codes: Negative value means error code.
  *     eNOUNFIXEDBUF_BFM - There is no unfixed buffer.
- *     some errors caused by fuction calls
+ *     some errors caused by function calls
  */
-Four edubfm_AllocTrain(
-    Four 	type)			/* IN type of buffer (PAGE or TRAIN) */
+Four edubfm_AllocTrain(Four type)			/* IN type of buffer (PAGE or TRAIN) */
 {
     Four 	e;			/* for error */
     Four 	victim;			/* return value */
     Four 	i;
     
 
-	/* Error check whether using not supported functionality by EduBfM */
+	//Allocating a buffer element in bufferPool
 	if(sm_cfgParams.useBulkFlush) ERR(eNOTSUPPORTED_EDUBFM);
 
+    for (i = 0; i < BI_NBUFS(type); i++){
+        Four currentIndex = (bufInfo->nextVictim + i) % bufInfo->nBufs;
+        if ((BI_BITS(type, currentIndex) & REFER) == 0) {
+            victim = currentIndex;
+            break;
+        } else {
+            BI_BITS(type, currentIndex) &= ~REFER;
+        }
+    }
 
-    
-    return( victim );
+    //Initializing the data structure related to the victim
+
+    //flushing contents to disk if a page was modified
+    if (BI_BITS(type, victim) & DIRTY) {
+        // Flush the buffer to disk
+        e = edubfm_FlushTrain(&victim, type);
+        if (e < 0) {
+            ERR(e);  // Handle error if flushing fails
+        }
+    }
+    //Initializing the element of bufTable corresponding to the victim
+    BI_BITS(type, victim) = 0;
+
+    //Setting nextVictim
+    bufInfo->nextVictim = (victim + 1) % bufInfo->nBufs;
+
+    //Deleting the array index of the victim from the hashTable
+    e = edubfm_Delete(&victim, type);
+    if (e < 0) {
+        ERR(e);  // Handle error if deletion fails
+    }
+
+    return(victim);
     
 }  /* edubfm_AllocTrain */

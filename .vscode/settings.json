@@ -1,0 +1,6 @@
+{
+    "files.associations": {
+        "edubfm_common.h": "c",
+        "edubfm_internal.h": "c"
+    }
+}
